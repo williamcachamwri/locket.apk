@@ -1,0 +1,23 @@
+package com.brentvatne.exoplayer;
+
+import android.app.Activity;
+import com.brentvatne.common.api.Source;
+
+/* compiled from: D8$$SyntheticClass */
+public final /* synthetic */ class ReactExoplayerView$$ExternalSyntheticLambda9 implements Runnable {
+    public final /* synthetic */ ReactExoplayerView f$0;
+    public final /* synthetic */ Source f$1;
+    public final /* synthetic */ ReactExoplayerView f$2;
+    public final /* synthetic */ Activity f$3;
+
+    public /* synthetic */ ReactExoplayerView$$ExternalSyntheticLambda9(ReactExoplayerView reactExoplayerView, Source source, ReactExoplayerView reactExoplayerView2, Activity activity) {
+        this.f$0 = reactExoplayerView;
+        this.f$1 = source;
+        this.f$2 = reactExoplayerView2;
+        this.f$3 = activity;
+    }
+
+    public final void run() {
+        this.f$0.lambda$initializePlayer$12(this.f$1, this.f$2, this.f$3);
+    }
+}

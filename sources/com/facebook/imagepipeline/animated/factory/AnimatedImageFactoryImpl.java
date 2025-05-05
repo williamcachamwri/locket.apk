@@ -1,0 +1,176 @@
+package com.facebook.imagepipeline.animated.factory;
+
+import android.graphics.Bitmap;
+import android.graphics.Rect;
+import com.facebook.common.internal.Preconditions;
+import com.facebook.common.memory.PooledByteBuffer;
+import com.facebook.common.references.CloseableReference;
+import com.facebook.imagepipeline.animated.base.AnimatedDrawableBackend;
+import com.facebook.imagepipeline.animated.base.AnimatedImage;
+import com.facebook.imagepipeline.animated.base.AnimatedImageResult;
+import com.facebook.imagepipeline.animated.impl.AnimatedDrawableBackendProvider;
+import com.facebook.imagepipeline.animated.impl.AnimatedImageCompositor;
+import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory;
+import com.facebook.imagepipeline.common.ImageDecodeOptions;
+import com.facebook.imagepipeline.image.CloseableAnimatedImage;
+import com.facebook.imagepipeline.image.CloseableImage;
+import com.facebook.imagepipeline.image.CloseableStaticBitmap;
+import com.facebook.imagepipeline.image.EncodedImage;
+import com.facebook.imagepipeline.image.ImmutableQualityInfo;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
+
+public class AnimatedImageFactoryImpl implements AnimatedImageFactory {
+    @Nullable
+    static AnimatedImageDecoder sGifAnimatedImageDecoder = loadIfPresent("com.facebook.animated.gif.GifImage");
+    @Nullable
+    static AnimatedImageDecoder sWebpAnimatedImageDecoder = loadIfPresent("com.facebook.animated.webp.WebPImage");
+    private final AnimatedDrawableBackendProvider mAnimatedDrawableBackendProvider;
+    private final PlatformBitmapFactory mBitmapFactory;
+    private final boolean mIsNewRenderImplementation;
+    private final boolean mTreatAnimatedImagesAsStateful;
+
+    @Nullable
+    private static AnimatedImageDecoder loadIfPresent(String str) {
+        try {
+            return (AnimatedImageDecoder) Class.forName(str).newInstance();
+        } catch (Throwable unused) {
+            return null;
+        }
+    }
+
+    public AnimatedImageFactoryImpl(AnimatedDrawableBackendProvider animatedDrawableBackendProvider, PlatformBitmapFactory platformBitmapFactory, boolean z) {
+        this(animatedDrawableBackendProvider, platformBitmapFactory, z, true);
+    }
+
+    public AnimatedImageFactoryImpl(AnimatedDrawableBackendProvider animatedDrawableBackendProvider, PlatformBitmapFactory platformBitmapFactory, boolean z, boolean z2) {
+        this.mAnimatedDrawableBackendProvider = animatedDrawableBackendProvider;
+        this.mBitmapFactory = platformBitmapFactory;
+        this.mIsNewRenderImplementation = z;
+        this.mTreatAnimatedImagesAsStateful = z2;
+    }
+
+    public CloseableImage decodeGif(EncodedImage encodedImage, ImageDecodeOptions imageDecodeOptions, Bitmap.Config config) {
+        AnimatedImage animatedImage;
+        if (sGifAnimatedImageDecoder != null) {
+            CloseableReference<PooledByteBuffer> byteBufferRef = encodedImage.getByteBufferRef();
+            Preconditions.checkNotNull(byteBufferRef);
+            try {
+                PooledByteBuffer pooledByteBuffer = byteBufferRef.get();
+                if (pooledByteBuffer.getByteBuffer() != null) {
+                    animatedImage = sGifAnimatedImageDecoder.decodeFromByteBuffer(pooledByteBuffer.getByteBuffer(), imageDecodeOptions);
+                } else {
+                    animatedImage = sGifAnimatedImageDecoder.decodeFromNativeMemory(pooledByteBuffer.getNativePtr(), pooledByteBuffer.size(), imageDecodeOptions);
+                }
+                return getCloseableImage(encodedImage.getSource(), imageDecodeOptions, animatedImage, config);
+            } finally {
+                CloseableReference.closeSafely((CloseableReference<?>) byteBufferRef);
+            }
+        } else {
+            throw new UnsupportedOperationException("To encode animated gif please add the dependency to the animated-gif module");
+        }
+    }
+
+    public CloseableImage decodeWebP(EncodedImage encodedImage, ImageDecodeOptions imageDecodeOptions, Bitmap.Config config) {
+        AnimatedImage animatedImage;
+        if (sWebpAnimatedImageDecoder != null) {
+            CloseableReference<PooledByteBuffer> byteBufferRef = encodedImage.getByteBufferRef();
+            Preconditions.checkNotNull(byteBufferRef);
+            try {
+                PooledByteBuffer pooledByteBuffer = byteBufferRef.get();
+                if (pooledByteBuffer.getByteBuffer() != null) {
+                    animatedImage = sWebpAnimatedImageDecoder.decodeFromByteBuffer(pooledByteBuffer.getByteBuffer(), imageDecodeOptions);
+                } else {
+                    animatedImage = sWebpAnimatedImageDecoder.decodeFromNativeMemory(pooledByteBuffer.getNativePtr(), pooledByteBuffer.size(), imageDecodeOptions);
+                }
+                return getCloseableImage(encodedImage.getSource(), imageDecodeOptions, animatedImage, config);
+            } finally {
+                CloseableReference.closeSafely((CloseableReference<?>) byteBufferRef);
+            }
+        } else {
+            throw new UnsupportedOperationException("To encode animated webp please add the dependency to the animated-webp module");
+        }
+    }
+
+    private CloseableImage getCloseableImage(@Nullable String str, ImageDecodeOptions imageDecodeOptions, AnimatedImage animatedImage, Bitmap.Config config) {
+        List<CloseableReference<Bitmap>> list;
+        CloseableReference<Bitmap> closeableReference = null;
+        try {
+            int frameCount = imageDecodeOptions.useLastFrameForPreview ? animatedImage.getFrameCount() - 1 : 0;
+            if (imageDecodeOptions.forceStaticImage) {
+                CloseableStaticBitmap of = CloseableStaticBitmap.of(createPreviewBitmap(animatedImage, config, frameCount), ImmutableQualityInfo.FULL_QUALITY, 0);
+                CloseableReference.closeSafely((CloseableReference<?>) null);
+                CloseableReference.closeSafely((Iterable<? extends CloseableReference<?>>) null);
+                return of;
+            }
+            if (imageDecodeOptions.decodeAllFrames) {
+                list = decodeAllFrames(animatedImage, config);
+                try {
+                    closeableReference = CloseableReference.cloneOrNull(list.get(frameCount));
+                } catch (Throwable th) {
+                    th = th;
+                    CloseableReference.closeSafely((CloseableReference<?>) null);
+                    CloseableReference.closeSafely((Iterable<? extends CloseableReference<?>>) list);
+                    throw th;
+                }
+            } else {
+                list = null;
+            }
+            if (imageDecodeOptions.decodePreviewFrame && closeableReference == null) {
+                closeableReference = createPreviewBitmap(animatedImage, config, frameCount);
+            }
+            CloseableAnimatedImage closeableAnimatedImage = new CloseableAnimatedImage(AnimatedImageResult.newBuilder(animatedImage).setPreviewBitmap(closeableReference).setFrameForPreview(frameCount).setDecodedFrames(list).setBitmapTransformation(imageDecodeOptions.bitmapTransformation).setSource(str).build(), this.mTreatAnimatedImagesAsStateful);
+            CloseableReference.closeSafely((CloseableReference<?>) closeableReference);
+            CloseableReference.closeSafely((Iterable<? extends CloseableReference<?>>) list);
+            return closeableAnimatedImage;
+        } catch (Throwable th2) {
+            th = th2;
+            list = null;
+            CloseableReference.closeSafely((CloseableReference<?>) null);
+            CloseableReference.closeSafely((Iterable<? extends CloseableReference<?>>) list);
+            throw th;
+        }
+    }
+
+    private CloseableReference<Bitmap> createPreviewBitmap(AnimatedImage animatedImage, Bitmap.Config config, int i) {
+        CloseableReference<Bitmap> createBitmap = createBitmap(animatedImage.getWidth(), animatedImage.getHeight(), config);
+        new AnimatedImageCompositor(this.mAnimatedDrawableBackendProvider.get(AnimatedImageResult.forAnimatedImage(animatedImage), (Rect) null), this.mIsNewRenderImplementation, new AnimatedImageCompositor.Callback() {
+            @Nullable
+            public CloseableReference<Bitmap> getCachedBitmap(int i) {
+                return null;
+            }
+
+            public void onIntermediateResult(int i, Bitmap bitmap) {
+            }
+        }).renderFrame(i, createBitmap.get());
+        return createBitmap;
+    }
+
+    private List<CloseableReference<Bitmap>> decodeAllFrames(AnimatedImage animatedImage, Bitmap.Config config) {
+        AnimatedDrawableBackend animatedDrawableBackend = this.mAnimatedDrawableBackendProvider.get(AnimatedImageResult.forAnimatedImage(animatedImage), (Rect) null);
+        final ArrayList arrayList = new ArrayList(animatedDrawableBackend.getFrameCount());
+        AnimatedImageCompositor animatedImageCompositor = new AnimatedImageCompositor(animatedDrawableBackend, this.mIsNewRenderImplementation, new AnimatedImageCompositor.Callback() {
+            public void onIntermediateResult(int i, Bitmap bitmap) {
+            }
+
+            @Nullable
+            public CloseableReference<Bitmap> getCachedBitmap(int i) {
+                return CloseableReference.cloneOrNull((CloseableReference) arrayList.get(i));
+            }
+        });
+        for (int i = 0; i < animatedDrawableBackend.getFrameCount(); i++) {
+            CloseableReference<Bitmap> createBitmap = createBitmap(animatedDrawableBackend.getWidth(), animatedDrawableBackend.getHeight(), config);
+            animatedImageCompositor.renderFrame(i, createBitmap.get());
+            arrayList.add(createBitmap);
+        }
+        return arrayList;
+    }
+
+    private CloseableReference<Bitmap> createBitmap(int i, int i2, Bitmap.Config config) {
+        CloseableReference<Bitmap> createBitmapInternal = this.mBitmapFactory.createBitmapInternal(i, i2, config);
+        createBitmapInternal.get().eraseColor(0);
+        createBitmapInternal.get().setHasAlpha(true);
+        return createBitmapInternal;
+    }
+}

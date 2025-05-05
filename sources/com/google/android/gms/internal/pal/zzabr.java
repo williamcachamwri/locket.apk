@@ -1,0 +1,15 @@
+package com.google.android.gms.internal.pal;
+
+/* compiled from: com.google.android.gms:play-services-pal@@20.0.1 */
+abstract class zzabr implements zzabt {
+    zzabr() {
+    }
+
+    public final /* synthetic */ Object next() {
+        return Byte.valueOf(zza());
+    }
+
+    public final void remove() {
+        throw new UnsupportedOperationException();
+    }
+}

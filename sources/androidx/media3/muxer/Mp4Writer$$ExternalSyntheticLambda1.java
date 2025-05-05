@@ -1,0 +1,10 @@
+package androidx.media3.muxer;
+
+import java.util.Comparator;
+
+/* compiled from: D8$$SyntheticClass */
+public final /* synthetic */ class Mp4Writer$$ExternalSyntheticLambda1 implements Comparator {
+    public final int compare(Object obj, Object obj2) {
+        return Integer.compare(((Track) obj).sortKey, ((Track) obj2).sortKey);
+    }
+}

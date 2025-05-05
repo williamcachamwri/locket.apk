@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:aapt="http://schemas.android.com/aapt" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent">
+    <ProgressBar android:layout_gravity="center" android:id="@+id/nimbus_loading_indicator" android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminate="true"/>
+    <FrameLayout android:id="@+id/ad_frame" android:layout_width="match_parent" android:layout_height="match_parent"/>
+    <ImageView android:layout_gravity="top|right|center_vertical|center_horizontal|center|end" android:id="@+id/nimbus_close" android:background="#59000000" android:padding="4dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_margin="4dp" android:src="@drawable/ic_nimbus_close" android:contentDescription="@string/nimbus_dismiss"/>
+</FrameLayout>
